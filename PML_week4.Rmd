@@ -1,0 +1,115 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Yu-Fu Wang"
+date: "2017/8/16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+# Synopsis
+The project goal is to predict the manner in which they did the exercise by using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+We will create a report describing how to build the model, how to use cross validation, the expected out of sample error, and why we made the choices we did. We will also use our prediction model to predict 20 different test cases.
+
+# Data Processing
+
+## 1.load data
+```{r}
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+
+#define seed
+set.seed(1001)
+
+#setup working directory
+setwd("F:\\Big data\\Course8\\week4")
+
+#load the training and test data
+trainingset <-read.csv("pml-training.csv", na.strings = c("NA", "DIV/0!", ""))
+testingset <-read.csv("pml-testing.csv", na.strings = c("NA", "DIV/0!", ""))
+
+
+dim(trainingset)
+
+dim(testingset)
+```
+
+## 2.clean data
+###filter out the columns which contain Na
+```{r}
+trainingset <- trainingset[,colSums(is.na(trainingset)) == 0]
+testingset <- testingset[,colSums(is.na(testingset)) == 0]
+```
+
+###remove columns wich I believe there's no outcome on the class
+```{r}
+trainingset <- trainingset[,-c(1:7)]
+testingset <- testingset[,-c(1:7)]
+
+dim(trainingset)
+dim(testingset)
+
+```
+
+# Prediction
+How we used cross validation 
+1. split trainging set ito sbu-training/test sets
+2. build model on sub-training set
+3. evaluate on sub-test set
+4. repeat and average estimated errors
+
+```{r}
+#partition the training data
+subSamples <- createDataPartition(y=trainingset$classe, p=0.75, list = FALSE)
+subTraining <- trainingset[subSamples,]
+subTesting <- trainingset[-subSamples,]
+```
+
+## 1st prediction model: Decision Tree
+
+```{r}
+library(rpart)
+
+modFit <- rpart(classe ~ ., data=subTraining, method = "class")
+
+# plot the decision tree
+rattle::fancyRpartPlot(modFit)
+
+# predic
+prediction1 <- predict(modFit, subTesting, type="class")
+
+# test results on subTesting data set
+confusionMatrix(prediction1, subTesting$classe)
+```
+
+
+## 2nd prediction model: Random Forest
+```{r}
+modFit2 <- randomForest(classe ~., data=subTraining, method="class")
+
+# predict
+prediction2 <- predict(modFit2, subTesting, type = "class")
+
+#test the result on the subTesting data set
+confusionMatrix(prediction2, subTesting$classe)
+```
+
+# Conclusion
+## 1.Why we made the choices you did
+Compare above two predictions, Random Forest algotihtm is better than Decision Tree.  Accuracy for Random Forest model is 0.996 and accuracy for Decision Tree is 0.751. The Random Forest model is chosen.
+
+## 2.What we think the expected out of sample error is
+The expected out-of-sample error will correspond to the expected number of missclassified observations/total observations in the Test data set, which is the quantity: 1-accuracy found from the cross-validation data set.
+The accuracy of the Random Forest model is 0.996. The expected out-of-sample error is estimated at 0.4%.
+
+
+# 3.Use our prediction model to predict 20 different test cases
+```{r}
+prediction_final <- predict(modFit2, testingset, type="class")
+prediction_final
+```
